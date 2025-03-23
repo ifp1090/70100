@@ -5,32 +5,61 @@ import { Document, Packer, Paragraph, TextRun, PageOrientation } from 'docx';
 export const generatePDFFromElement = async (elementId: string, filename = 'document.pdf') => {
   const element = document.getElementById(elementId);
   if (!element) {
-    alert('未找到预览内容，无法生成PDF');
+    alert('找不到预览内容，无法导出 PDF');
     return;
   }
 
-  const opt = {
-    margin:       0,
-    filename:     filename,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  {
-      scale: 2,
-      useCORS: true,
-    },
-    jsPDF:        {
-      unit: 'mm',
-      format: [70, 100],
-      orientation: 'portrait',
-    }
-  };
+  // 克隆节点，避免原页面被破坏
+  const clone = element.cloneNode(true) as HTMLElement;
+
+  // 创建隐藏容器放入 clone
+  const hiddenContainer = document.createElement('div');
+  hiddenContainer.style.position = 'fixed';
+  hiddenContainer.style.top = '-9999px';
+  hiddenContainer.style.left = '-9999px';
+  hiddenContainer.style.width = '70mm';
+  hiddenContainer.style.height = '100mm';
+  hiddenContainer.style.padding = '0';
+  hiddenContainer.style.background = 'white';
+  hiddenContainer.appendChild(clone);
+  document.body.appendChild(hiddenContainer);
 
   try {
-    await html2pdf().from(element).set(opt).save();
+    // 等图片加载完成
+    await Promise.all(
+      Array.from(clone.querySelectorAll('img')).map(img => {
+        if (!img.complete) {
+          return new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve(); // 忽略加载失败
+          });
+        }
+      })
+    );
+
+    await html2pdf().from(hiddenContainer).set({
+      margin:       0,
+      filename:     filename,
+      image:        { type: 'jpeg', quality: 1 },
+      html2canvas:  {
+        scale: 2,
+        useCORS: true,
+        logging: true
+      },
+      jsPDF:        {
+        unit: 'mm',
+        format: [70, 100],
+        orientation: 'portrait',
+      }
+    }).save();
   } catch (err) {
-    console.error('生成PDF失败:', err);
-    alert('生成 PDF 时出现错误');
+    console.error('生成 PDF 出错:', err);
+    alert('生成 PDF 时出错');
+  } finally {
+    document.body.removeChild(hiddenContainer);
   }
 };
+
 
 // ✅ Word 生成函数
 export const generateDOCXFromMarkdown = async (markdown: string, filename = 'document.docx') => {
