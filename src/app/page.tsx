@@ -109,12 +109,40 @@ $$
           </div>
 
           <div className="mt-4 flex gap-4">
-            <Button onClick={() => generatePDFFromElement('pdf-preview')}>
-              提交并下载 PDF
-            </Button>
-            <Button onClick={() => generateDOCXFromMarkdown(markdown)}>
-              提交并下载 Word 文档
-            </Button>
+          <Button
+  onClick={async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        await generatePDFFromElement('pdf-preview');
+      } else {
+        alert('PDF 下载只能在浏览器中进行');
+      }
+    } catch (err) {
+      console.error('PDF 生成出错', err);
+      alert('生成 PDF 时出现错误');
+    }
+  }}
+>
+  提交并下载 PDF
+</Button>
+
+<Button
+  onClick={async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        await generateDOCXFromMarkdown(markdown);
+      } else {
+        alert('Word 下载只能在浏览器中进行');
+      }
+    } catch (err) {
+      console.error('Word 生成出错', err);
+      alert('生成 Word 时出现错误');
+    }
+  }}
+>
+  提交并下载 Word 文档
+</Button>
+
           </div>
         </TabsContent>
       </Tabs>
