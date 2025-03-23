@@ -1,83 +1,82 @@
-import React, { useEffect, useRef, useState } from 'react';
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
-import 'katex/dist/katex.min.css';
+import rehypeKatex from 'rehype-katex';
 
-interface Props {
+interface PagedPreviewProps {
   markdown: string;
 }
 
-const PAGE_WIDTH_MM = 70;
-const PAGE_HEIGHT_MM = 100;
-const MM_TO_PX = 3.78; // 1mm = ~3.78px
-
-const PAGE_STYLE = {
-  width: `${PAGE_WIDTH_MM * MM_TO_PX}px`,
-  height: `${PAGE_HEIGHT_MM * MM_TO_PX}px`,
-  padding: `${5 * MM_TO_PX}px`, // 5mm padding
-  boxSizing: 'border-box' as const,
-  overflow: 'hidden' as const,
-  border: '1px solid #ccc',
-  marginBottom: '20px',
-  background: 'white',
-  fontFamily: '"Noto Sans SC", "Arial", sans-serif',
-  fontSize: '12px',
-  lineHeight: 1.4,
-  color: '#111',
-};
-
-export default function PagedPreview({ markdown }: Props) {
+export default function PagedPreview({ markdown }: PagedPreviewProps) {
+  const [pages, setPages] = useState<JSX.Element[][]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [pages, setPages] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    const div = document.createElement('div');
+    div.style.position = 'absolute';
+    div.style.visibility = 'hidden';
+    div.style.width = '70mm';
+    div.style.padding = '0';
+    div.style.lineHeight = '1.5';
+    div.style.fontSize = '10pt';
+    div.style.fontFamily = 'Noto Sans SC, sans-serif';
+    document.body.appendChild(div);
 
-    const temp = document.createElement('div');
-    temp.style.position = 'absolute';
-    temp.style.visibility = 'hidden';
-    temp.style.width = `${PAGE_WIDTH_MM * MM_TO_PX - 2 * 5 * MM_TO_PX}px`;
-    temp.style.padding = `${5 * MM_TO_PX}px`;
-    temp.style.fontSize = '12px';
-    temp.style.lineHeight = '1.4';
-    temp.style.fontFamily = '"Noto Sans SC", "Arial", sans-serif';
-    document.body.appendChild(temp);
+    const elements: JSX.Element[] = markdown
+      .split('\n\n')
+      .map((block, i) => (
+        <div key={i} className="mb-2 break-inside-avoid">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeRaw, rehypeKatex]}
+          >
+            {block}
+          </ReactMarkdown>
+        </div>
+      ));
 
-    temp.innerHTML = markdown
-      .split('\n')
-      .map((line) => line.trim())
-      .join('<br/>');
+    const tempPages: JSX.Element[][] = [];
+    let currentPage: JSX.Element[] = [];
+    let currentHeight = 0;
+    const maxHeight = 100 * 3.78 - 16; // 100mm to px - padding buffer
 
-    const pageHeightPx = PAGE_HEIGHT_MM * MM_TO_PX;
-    const lineHeight = 17;
-    const totalHeight = temp.scrollHeight;
-    const pageCount = Math.ceil(totalHeight / pageHeightPx);
+    elements.forEach((el, i) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'mb-2';
+      div.appendChild(wrapper);
+      wrapper.innerHTML = document.createElement('div').appendChild(document.createTextNode(el.props.children)).textContent || '';
+      const height = wrapper.offsetHeight;
+      div.removeChild(wrapper);
 
-    const lines = markdown.split('\n');
-    const linesPerPage = Math.floor(pageHeightPx / lineHeight);
+      currentHeight += height;
+      if (currentHeight > maxHeight) {
+        if (currentPage.length > 0) tempPages.push(currentPage);
+        currentPage = [el];
+        currentHeight = height;
+      } else {
+        currentPage.push(el);
+      }
+    });
 
-    const newPages: string[] = [];
-    for (let i = 0; i < pageCount; i++) {
-      const chunk = lines.slice(i * linesPerPage, (i + 1) * linesPerPage).join('\n');
-      newPages.push(chunk);
-    }
-
-    setPages(newPages);
-    document.body.removeChild(temp);
+    if (currentPage.length > 0) tempPages.push(currentPage);
+    setPages(tempPages);
+    document.body.removeChild(div);
   }, [markdown]);
 
   return (
-    <div ref={containerRef}>
-      {pages.map((page, index) => (
-        <div key={index} style={PAGE_STYLE}>
-          <ReactMarkdown
-            children={page}
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeKatex, rehypeRaw]}
-          />
+    <div className="flex flex-col items-center gap-4">
+      {pages.map((content, i) => (
+        <div
+          key={i}
+          className="w-[70mm] h-[100mm] overflow-hidden bg-white text-black p-4 shadow-md text-[10pt] leading-relaxed"
+        >
+          {content.map((el, j) => (
+            <div key={j}>{el}</div>
+          ))}
         </div>
       ))}
     </div>
